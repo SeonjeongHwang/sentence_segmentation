@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_LENGTH 1715
+#define MAX_LENGTH 1671
 #define TSIZE 1048576
 #define SEED 1159241
-#define WINDOW_S 15
+#define WINDOW_S 5
 #define MAX_WORD 100
 
 int hash[TSIZE];
@@ -21,10 +21,24 @@ typedef struct hashnd {
 	struct hashnd *next;
 }HASHND;
 
-typedef struct sent {
-	char *wd;
+typedef struct word {
+	int num;
 	int index;
-}SENTND;
+	double co;
+}WORDND;
+
+typedef struct buffer {
+	int num;
+	int index;
+	char* word;
+	struct buffer *next;
+}BUFFER;
+
+WORDND window[MAX_LENGTH];
+int sind, eind;
+int sentnum = 0;
+int punct_l = -1;
+int punct_r = -1;
 
 unsigned int bitwisehash(char *word, int tsize, unsigned int seed);
 int scmp(char *s1, char *s2);
@@ -102,7 +116,7 @@ int indexinhash(HASHND ** ht, char *w) {
 	}
 }
 
-void printinghash(HASHND ** ht) {
+void printinghash(HASHND ** ht, int ind) {
 	HASHND *htmp;
 	int index = 0;
 	int total = 0;
@@ -112,8 +126,10 @@ void printinghash(HASHND ** ht) {
 			continue;
 		}
 		for (;htmp != NULL; htmp = htmp->next) {
-			//printf("(%s, %d)\n", htmp->wd, htmp->count);
-			total += htmp->count;
+			if (htmp->index == ind) {
+				printf("(%d, %s, %d)\n", htmp->index, htmp->wd, htmp->count);
+				total += htmp->count;
+			}
 		}
 	}
 	//printf("total=%d", total);
@@ -133,9 +149,8 @@ void printinghash(HASHND ** ht) {
 
 int make_W(HASHND **ht, FILE *fin) {
 	char word[MAX_WORD];
-	unsigned int indarr[MAX_WORD], w1_ind, w2_ind;
+	unsigned int indarr[MAX_LENGTH], w1_ind, w2_ind;
 	int ind = 0;
-	int flag;
 
 	while (!feof(fin)) {
 		int i, j, num;
@@ -145,14 +160,10 @@ int make_W(HASHND **ht, FILE *fin) {
 		if (n) {
 			for (i = 0; i < ind; i++) {
 				w1_ind = indarr[i];
-				flag = 0;
-				for (j = i - WINDOW_S, weight = 0.7; j < i + WINDOW_S && j < ind; j++) {
-					if (j < 0 || j >= WINDOW_S * 2 + 1) continue;
+				for (j = i + 1, weight = 1.0 - (0.3/WINDOW_S); j <= i + WINDOW_S && j < ind; j++, weight-=(0.3/WINDOW_S)) {
 					w2_ind = indarr[j];
 					if (w1_ind == -1 || w2_ind == -1) W[w1_ind][w2_ind] = -1;
 					else {
-						if (weight < 1) weight += 0.3 / WINDOW_S;
-						else weight -= 0.3 / WINDOW_S;
 						if (W[w1_ind][w2_ind] != 0) {
 							num = (int)W[w1_ind][w2_ind];
 							part_w = W[w1_ind][w2_ind] - (double)num;
@@ -207,13 +218,41 @@ void flag_one(int index) {
 	}
 }
 
+void insert_buffer(BUFFER *b, int sentnum, int ind, char* wd) {
+	BUFFER *new = (BUFFER*)malloc(sizeof(BUFFER));
+	new->next = NULL; new->num = sentnum; new->index = ind; new->word = wd;
+	BUFFER *temp, *prev = NULL;
+	for (temp = b; temp != NULL; prev = temp, temp = temp->next);
+	prev->next = new;
+}
+
+BUFFER* delete_buffer(BUFFER *b) {
+	BUFFER *result;
+	if (b != NULL) {
+		result = b;
+		b = b->next;
+	}
+	return result;
+}
+
+char* printword(BUFFER* b,int sentnum) {
+	if (b == NULL) return NULL;
+	char* word;
+	if (b->num < sentnum) {
+		word = b->word;
+		delete_buffer(b);
+		return word;
+	}
+	else return NULL;
+}
+
 int main(void)
 {
 	HASHND **hashtb = inithashtable();
 	char word[100];
 
 	//hashtable에 단어별 빈도수, W에서의 index 삽입
-	FILE *fin = fopen("data2.txt", "r");
+	FILE *fin = fopen("replace_ordinal.txt", "r");
 	while (!feof(fin)) {
 		int n = get_word(word, fin);
 		if (n) continue;
@@ -222,21 +261,26 @@ int main(void)
 	total_num = Windex;
 	fclose(fin);
 
-	printf("%d", total_num);
+	printf("words number%d\n", total_num);
 
 	//printinghash(hashtb);
 
-	/*int count = 0;
-	fin = fopen("data.txt", "r");
+	int count = 0;
+	fin = fopen("replace_ordinal.txt", "r");
 	while (!feof(fin)) {
 		if (count > 200) break;
 		count++;
 		int ch = fgetc(fin);
 		printf("%c", ch);
 	}
-	fclose(fin);*/
+	fclose(fin);
 
-	fin = fopen("data2.txt", "r");
+	for (int i = 0; i < 5; i++) {
+		printinghash(hashtb, i);
+	}
+
+
+	fin = fopen("replace_ordinal.txt", "r");
 	if (make_W(hashtb, fin)) {
 		printf("error occured in making_W\n");
 		return 0;
@@ -244,7 +288,6 @@ int main(void)
 	fclose(fin);
 
 	FILE *fout = fopen("matrixW.txt", "w");
-	printf("%d\n", total_num);
 	for (int i = 0; i < total_num; i++) {
 		for (int j = 0; j < total_num; j++) {
 			if (j == total_num - 1) fprintf(fout, "%f", W[i][j]);
@@ -270,16 +313,125 @@ int main(void)
 	// only probability
 	fclose(fout);
 
-	/*
-	for (int i = 0; i < 5; i++) {
-		for (int j = 0; j < 5; j++) {
-			w = (int)W[i][j];
-			if (j == 4) printf("%f", W[i][j] - (double)w);
-			else printf("%f ", W[i][j] - (double)w);
+	FILE *hashfile = fopen("hashtable.txt", "w");
+	HASHND *htmp, *hnext;
+	for (int i = 0; i < TSIZE; i++) {
+		htmp = hashtb[i];
+		if (htmp == NULL) continue;
+		hnext = htmp->next;
+		for (;htmp != NULL; htmp = htmp->next) {
+			fprintf(hashfile, "%s %d %d %d\n", htmp->wd, htmp->count, htmp->index, htmp->flag);
+			if (hnext != NULL) {
+				hnext = hnext->next;
+			}
+			else fprintf(hashfile, "\n");
 		}
-		printf("\n");
 	}
-	*/
+	printf("hashtable.txt generation completed.\n");
+	fclose(hashfile);
 
+
+	FILE *test = fopen("test_input.txt", "r");
+	FILE *result = fopen("test_result.txt", "w");
+	int flag1 = 0; //0:처음 문장 받기 -> WINDOW + 1이 채워지면 flag =>1
+	int flag2 = 0;
+	int prflag;
+	int center = WINDOW_S;
+	int tmpind;
+	BUFFER *buffer = NULL, *bfptr = NULL;
+	sind = center; eind = WINDOW_S * 2;
+
+	while (1) {
+		/*window update*/
+		if (flag1 == 0) { //window의 center부터 단어를 넣는 경우
+			sind = center;
+			if (flag2 == 0) { //input stream으로부터 단어를 받아 window에 넣는 경우
+				for (int i = sind; i <= eind; i++) {
+					if (!feof(test)) {
+						get_word(word, test);
+						tmpind = indexinhash(hashtb, word);
+						insert_buffer(buffer, sentnum, tmpind, word);
+						window[i].num = sentnum; window[i].index = tmpind;
+						sentnum++;
+					}
+					else {
+						eind = i-1;
+						break;
+					}
+				}
+				flag2 = 1;
+			}
+			else { //flag2==1, buffer로부터 단어를 받아 window에 넣는 경우
+				BUFFER* temp = buffer;
+				for (int i = sind; i <= eind; i++, temp = temp->next) {
+					int index, sentnum;
+					if (buffer == NULL) {
+						eind = i - 1;
+						break;
+					}
+					index = temp->index; sentnum = temp->num;
+					window[i].index = index; window[i].num = sentnum;
+				}
+				bfptr = temp; //buffer에서 다음에 읽을 값
+			}
+			flag1 = 1;
+		}
+		else {
+			if (sind > 0) sind--;
+			for (int i = sind; i < eind; i++) {
+				window[i].index = window[i + 1].index;
+				window[i].num = window[i + 1].num;
+			}
+			if (bfptr == NULL) { //input stream에서 한 단어를 가져와 추가해줌.
+				if (!feof(test)) {
+					get_word(word, test);
+					tmpind = indexinhash(hashtb, word);
+					insert_buffer(buffer, sentnum, tmpind, word);
+					window[eind].num = sentnum; window[eind].index = tmpind;
+					sentnum++;
+				}
+				else eind--;
+			}
+			else { //buffer에서 가져와 한 단어를 추가해줌.
+				window[eind].num = bfptr->num; window[eind].index = bfptr->index;
+				bfptr = bfptr->next;
+
+			}
+		}
+		/*window 내의 단어간 cooccurrence 체크*/
+		for (int i = sind; i < eind; i++) {
+			if (i < center) window[i].co = W[window[i].index][window[center].index];
+			else if (i == center) window[i].co = 1;
+			else window[i].co = W[window[center].index][window[i].index];
+		}
+		for (int l = center; l > sind; l--) {
+			if (window[l].co > 0 && window[l - 1].co == 0)
+				if (punct_l < window[l].num) punct_l = window[l].num;
+		}
+		for (int r = center; r < eind; r++) {
+			if (window[r].co > 0 && window[r + 1].co == 0)
+				if (punct_r > window[r + 1].num) punct_r = window[r + 1].num;
+		}
+		if (punct_l == punct_r) {
+			char* outw;
+			char f = 0;
+			while (1) {
+				outw = printword(buffer, punct_l);
+				if (!outw) {
+					if (!f) {
+						fprintf(result, "%s", outw);
+						f = 1;
+					}
+					else fprintf(result, " %s", outw);
+				}
+				else {
+					fprintf(result, "\n");
+					flag1 = 0;
+				}
+			}
+		}
+	}
+	fclose(test);
+	fclose(result);
 	return 0;
 }

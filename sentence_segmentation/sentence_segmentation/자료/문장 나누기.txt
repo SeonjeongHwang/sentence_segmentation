@@ -1,0 +1,67 @@
+1. 단어 수: 1715개
+W[1715][1715] => 초기화: 대각선은 1, 나머지는 0으로(init_W())
+빈도수가 너무 커 flag가 1이 된 단어의 index=i일 때 모든 W[i][], W[][i]는 -1
+
+2. 해시테이블 생성
+typedef hashnd{
+	char *word;
+	int count; (문서 전체에서 word의 개수)
+	int index; (W에서의 word index)
+	int flag = 0; (flag==1인 경우 the, a와 같이 아무 맥락에서나 쓰이는 단어, 고려하지 않음)
+	struct hashnd *next; (linked list에서의 다음 노드)
+}HASHND
+
+inithashtable() => tsize 길이의 HASHND 배열 생성(모든 entry null)
+
+bitwisehash(word, tsize, seed)
+=> word의 해시값 -> 해시테이블의 해당 인덱스의 노드로 추가됨
+
+<해시테이블 형태 예시>
+1[n]-n
+2[n]-n-n-n
+3[ ]
+4[n]-n-n
+
+
+3.window=3일 때 동시발생률 계산 예시
+단어-> 해시값 구함-> 해시테이블에서 index찾기
+
+
+
+						              <i>
+The links below contain word vectors obtained  from   the  respective corpora.
+				      <j=-3>  <j=-2> <j=-1>            <j=1>
+
+respective-obtained: 0.7-> 1.7
+respective-from: 0.8 -> 1.8
+respective-the: (the의 flag=1이므로) -1
+respective-corpora: 0.9 ->1.9
+
+		          <i>
+vectors    cat    from respective corpora apple.
+<j=-3>   <j=-2>  <j=-1>		   <j=1>  <j=2>
+
+respective-vectors: 0.7 => 1.7
+respective-cat: 0.8 => 1.8
+respective-from: 0.9 => 원래값:1.8/ num=1, w=0.8 => (1*0.8+1*0.9)/(1+1) = 0.85
+respective-corpora: 0.9 => 원래값:1.9/ num=1, w=0.9 => (1*0.9+1*0.9)/(1+1) = 0.9
+respective-apple: 0.8 => 1.8
+
+==>>> 모든 문장의 단어에 대해 진행->F생성
+
+4.input_text.txt입력 => 점이 없이 모든 문장이 이어져있는 텍스트 문서
+
+int punc: 점 찍을 위치 바로 앞 단어의 index(예측값)
+int 후보punc[]: 확정되지 않은 punc 후보값 저장
+int count: 0.7보다 동시발생률이 적은 단어의 수 체크(3개 이상 다름=>punc확정, 3 단어를 확인해보기 전 window 끝나면 
+int history[window]: wordi와 wordj1, wordj2, wordj3의 빈도수를 배열에 순서대로 저장
+
+0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+a b c d e f g h i j k  l  m  n  o  p
+
+
+w = 0.1
+
+0.7 0.8 0.9 1.0 
+		  
+

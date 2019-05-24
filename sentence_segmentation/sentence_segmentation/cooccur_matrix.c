@@ -6,12 +6,18 @@
 #define SEED 1159241
 #define WINDOW_S 5
 #define MAX_WORD 100
-#define MAX_COUNT 500
+#define MAX_COUNT 1000
 
 int hash[TSIZE];
 double W[MAX_LENGTH][MAX_LENGTH];
 int total_num = 0;
 int Windex = 0;
+
+/*common variables*/
+// num: the index of word from test_input().txt, differenct nums to one word at different places
+// index: index of matrix W, W: relative cooccurrence distance between the nearest two words -> co
+// over: when the number of word appearances is above the limit, over = 1
+// start: a first word of a sentence(1)
 
 typedef struct hashnd {
 	char *wd;
@@ -77,7 +83,7 @@ HASHND ** inithashtable() {
 	return ht;
 }
 
-void hashinsert(HASHND **ht, char *w, int start) {
+void hashinsert(HASHND **ht, char *w, int start) { //insert a word node into the hash table
 	HASHND *htmp, *hprv;
 	unsigned int hval = bitwisehash(w, TSIZE, SEED);
 
@@ -99,7 +105,7 @@ void hashinsert(HASHND **ht, char *w, int start) {
 	else {
 		if (htmp->count > MAX_COUNT){
 			if (htmp->over == 0) {
-				htmp->over = 1; //빈도수가 한계치 이상일 경우 flag = 1 설정(후에 고려 안하는 단어)
+				htmp->over = 1; 
 				flag_one(htmp->index);
 			}
 		}
@@ -108,7 +114,7 @@ void hashinsert(HASHND **ht, char *w, int start) {
 	return;
 }
 
-int indexinhash(HASHND ** ht, char *w) {
+int indexinhash(HASHND ** ht, char *w) { //search the index of the word
 	unsigned int hval = bitwisehash(w, TSIZE, SEED);
 	HASHND *htmp, *hprv;
 	for (hprv = NULL, htmp = ht[hval]; htmp != NULL && scmp(htmp->wd, w) != 0; hprv = htmp, htmp = htmp->next);
@@ -122,6 +128,28 @@ int indexinhash(HASHND ** ht, char *w) {
 		}
 		return htmp->index;
 	}
+}
+
+int print_count(HASHND **ht, char *w) { //return the number of the word appearances from he hashtable
+	unsigned int hval = bitwisehash(w, TSIZE, SEED);
+	HASHND *htmp, *hprv;
+	for (hprv = NULL, htmp = ht[hval]; htmp != NULL && scmp(htmp->wd, w) != 0; hprv = htmp, htmp = htmp->next);
+	if (htmp == NULL) {
+		printf("There isn't %s in hashtable\n", w);
+		return -2;
+	}
+	return htmp->count;
+}
+
+int print_start(HASHND **ht, char *w) { //return the start value from the hashtable
+	unsigned int hval = bitwisehash(w, TSIZE, SEED);
+	HASHND *htmp, *hprv;
+	for (hprv = NULL, htmp = ht[hval]; htmp != NULL && scmp(htmp->wd, w) != 0; hprv = htmp, htmp = htmp->next);
+	if (htmp == NULL) {
+		printf("There isn't %s in hashtable\n", w);
+		return -2;
+	}
+	return htmp->start;
 }
 
 int printinghash(HASHND ** ht) {
@@ -141,7 +169,7 @@ int printinghash(HASHND ** ht) {
 	return count;
 }
 
-int check_start(HASHND **ht, char *wd) {
+int check_start(HASHND **ht, char *wd) { //return the word's start value
 	HASHND *htmp;
 	unsigned int hval = bitwisehash(wd, TSIZE, SEED);
 	for (htmp = ht[hval]; htmp != NULL && scmp(htmp->wd, wd) != 0; htmp = htmp->next);
@@ -161,7 +189,7 @@ int check_start(HASHND **ht, char *wd) {
 	}
 }*/
 
-int make_W(HASHND **ht, FILE *fin) {
+int make_W(HASHND **ht, FILE *fin) { //make matrix W
 	char word[MAX_WORD];
 	unsigned int indarr[MAX_LENGTH], w1_ind, w2_ind;
 	int ind = 0;
@@ -213,7 +241,7 @@ int make_W(HASHND **ht, FILE *fin) {
 	return 0;
 }
 
-int get_word(char *word, FILE *fin) { // return 1: 줄바꿈, 0:정상단어, -1:[TERMS] 또는 [CURRENCY]
+int get_word(char *word, FILE *fin) { // return 1: \n, 0: regular words, -1: [TERMS] or [CURRENCY] or [DATE]
 	int i = 0, ch;
 	for (; ;) {
 		ch = fgetc(fin);
@@ -230,7 +258,7 @@ int get_word(char *word, FILE *fin) { // return 1: 줄바꿈, 0:정상단어, -1:[TERMS
 		word[i++] = ch;
 	}
 	word[i] = '\0';
-	if (scmp(word, "[TERMS]") == 0 || scmp(word, "[CURRENCY]") == 0) return -1;
+	if (scmp(word, "[TERMS]") == 0 || scmp(word, "[CURRENCY]") == 0 || scmp(word, "[DATE]") == 0) return -1;
 	return 0;
 }
 
@@ -268,7 +296,6 @@ void delete_buffer(BUFFER **b) {
 	BUFFER *temp;
 	temp = *b;
 	if (*b != NULL) {
-		printf("b->word: %s\n", temp->word);
 		BUFFER *result;
 		result = *b;
 		*b = (*b)->next;
@@ -280,7 +307,6 @@ char* printword(BUFFER* b, int punctnum) {
 	if (b == NULL) {
 		return NULL;
 	}
-	printf("b->num: %d | sentnum: %d\n", b->num, punctnum);
 	printf("<b> num: %d / index: %d / word: %s\n", b->num, b->index, b->word);
 	char* word = (char*)malloc(strlen(b->word) + 1);
 	if (b->num < punctnum) {
@@ -297,7 +323,7 @@ int main(void)
 	int strcount = 0;
 	int start = 1;
 
-	//hashtable에 단어별 빈도수, W에서의 index 삽입
+	//make a hashtable
 	FILE *fin = fopen("replace_ordinal.txt", "r");
 	while (!feof(fin)) {
 		int n = get_word(word, fin);
@@ -311,6 +337,9 @@ int main(void)
 	}
 	total_num = Windex;
 	fclose(fin);
+	printf("Make hash table\n");
+
+	printf("aplicable: %d\n", print_count(hashtb, "APPLICABLE"));
 
 	//printf("words number%d\n", total_num);
 
@@ -323,6 +352,9 @@ int main(void)
 		return 0;
 	}
 	fclose(fin);
+
+	printf("CANCELATION: %d\n", print_start(hashtb, "CANCELLATION"));
+
 	/*
 	FILE *fout = fopen("matrixW.txt", "w");
 	for (int i = 0; i < total_num; i++) {
@@ -368,10 +400,11 @@ int main(void)
 	fclose(hashfile);
 	*/
 	
-	FILE *test = fopen("test_input.txt", "r");
-	FILE *result = fopen("test_result.txt", "w");
-	int flag1 = 0; //0:처음 문장 받기 -> WINDOW + 1이 채워지면 flag =>1
-	int flag2 = 0;
+
+	FILE *test = fopen("test_input3.txt", "r");
+	FILE *result = fopen("test_result3.txt", "w");
+	int flag1 = 0; //0: fill the empty window from index of center to last of the window //1: add one word to last index of the window
+	int flag2 = 0; //when the window is empty(flag1=0) //0: get words from test_input().txt //1: get words from the buffer
 	int prflag;
 	int center = WINDOW_S;
 	int tmpind;
@@ -379,10 +412,9 @@ int main(void)
 
 	while (1) {
 		/*window update*/
-		printf("flag1 = %d | flag2 = %d\n", flag1, flag2);
-		if (flag1 == 0) { //window의 center부터 단어를 넣는 경우
+		if (flag1 == 0) { //fill the window from the center of it
 			sind = center; eind = WINDOW_S * 2;
-			if (flag2 == 0) { //input stream으로부터 단어를 받아 window에 넣는 경우
+			if (flag2 == 0) { //get words from test_input().txt
 				for (int i = sind; i <= eind; i++) {
 					if (!feof(test)) {
 						n = get_word(word, test);
@@ -404,12 +436,11 @@ int main(void)
 				}
 				flag2 = 1;
 			}
-			else { //flag2==1, buffer로부터 단어를 받아 window에 넣는 경우
-				printf("buffer에서 단어 꺼내오기\n");
+			else { //flag2==1, fill the window by getting words from the buffer
 				BUFFER* temp = bfptr;
 				int i, index, sentnum;
 				for (i = sind; i <= eind; i++) {
-					if (temp != NULL && (scmp(temp->word, "[TERMS]") == 0 || scmp(temp->word, "[CURRENCY]") == 0)) {
+					if (temp != NULL && (scmp(temp->word, "[TERMS]") == 0 || scmp(temp->word, "[CURRENCY]") == 0 || scmp(temp->word, "[DATE]") == 0)) {
 						i--;
 						temp = temp->next;
 						continue;
@@ -444,24 +475,24 @@ int main(void)
 						}
 					}
 				}
-				bfptr = temp; //buffer에서 다음에 읽을 값
+				bfptr = temp; //buffer pointer(first word in the buffer)
 			}
 			flag1 = 1;
 		}
-		else { //한 글자씩
+		else { //add one word
 			if (sind > 0) sind--;
 			for (int i = sind; i < eind; i++) {
 				window[i].num = window[i + 1].num;
 				window[i].index = window[i + 1].index;
 			}
 			int flag = 0;
-			if (bfptr != NULL) { //buffer에서 가져와 한 단어를 추가해줌.
+			if (bfptr != NULL) { //get a word from the buffer
 				while (bfptr != NULL) {
 					if (bfptr->index == -1) {
 						bfptr = bfptr->next;
 						continue;
 					}
-					else if (scmp(bfptr->word, "[TERMS]") == 0 || scmp(bfptr->word, "[CURRENCY]") == 0) {
+					else if (scmp(bfptr->word, "[TERMS]") == 0 || scmp(bfptr->word, "[CURRENCY]") == 0 || scmp(bfptr->word, "[DATE]") == 0) {
 						bfptr = bfptr->next;
 						continue;
 					}
@@ -471,7 +502,7 @@ int main(void)
 					break;
 				}
 			}
-			if (bfptr == NULL && flag == 0) { //input stream에서 한 단어를 가져와 추가해줌.
+			if (bfptr == NULL && flag == 0) { //get a word from test_input().txt
 				while (1) {
 					if (!feof(test)) {
 						n = get_word(word, test);
@@ -493,14 +524,14 @@ int main(void)
 			}
 		}
 
-		/*window 내의 단어간 cooccurrence 체크*/
+		/*check the cooccurence between two words in the window*/
 		for (int i = sind; i <= eind; i++) {
 			if (i < center) window[i].co = W[window[i].index][window[center].index];
 			else if (i == center) window[i].co = 1;
 			else window[i].co = W[window[center].index][window[i].index];
 		}
 
-		printf("\nsentnum | index | co\n");
+		printf("\n       word_num |      index |         co\n");
 		for (int i = sind; i <= eind; i++) {
 			printf("%3d: %10d | %10d | %10f\n", i, window[i].num, window[i].index, window[i].co);
 		}
@@ -531,7 +562,9 @@ int main(void)
 		int f = 0;
 		int cnt = 0;
 		int breakflag = 0;
-		if(eind == 0){
+		if(eind == 0){ //there aren't more words in test_input().txt or the buffer
+			printf("\n-------------------------------------------\n");
+			printf("Last sentence\n");
 			punct_l = sentnum;
 			while (1) {
 				outw = printword(buffer, punct_l);
@@ -552,7 +585,9 @@ int main(void)
 			}
 		}
 		else if (punct_l == -1 && punct_r == -1) continue;
-		else if ((punct_l < window[sind].num && punct_r < window[sind].num) && (punct_l != -1 && punct_r != -1)) {
+		else if ((punct_l < window[sind].num && punct_r < window[sind].num) && (punct_l != -1 && punct_r != -1)) { //when the sentence's end point is ambiguous
+			printf("\n-------------------------------------------\n");
+			printf("Find the end of this sentence\n");
 			int low, high;
 			int tail;
 			if (punct_l < punct_r) {
@@ -591,8 +626,8 @@ int main(void)
 								break;
 							}
 							else {
+								fprintf(result, " %s", buffer->word);
 								delete_buffer(&buffer);
-								fprintf(result, " %s", outw);
 							}
 						}
 					}
@@ -600,7 +635,7 @@ int main(void)
 				}
 			}
 		}
-		else if (punct_l == punct_r) {
+		else if (punct_l == punct_r) { //clear end point
 			int tail = punct_tail_l;
 			printf("\n-------------------------------------------\n");
 			printf("punct_l is equal to punct_r\n");

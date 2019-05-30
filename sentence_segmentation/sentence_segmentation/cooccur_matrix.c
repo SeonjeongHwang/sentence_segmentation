@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_LENGTH 1671
+//#define MAX_LENGTH 1671 //ts
+#define MAX_LENGTH 13164 //brown
 #define TSIZE 1048576
 #define SEED 1159241
 #define WINDOW_S 5
@@ -86,7 +87,6 @@ HASHND ** inithashtable() {
 void hashinsert(HASHND **ht, char *w, int start) { //insert a word node into the hash table
 	HASHND *htmp, *hprv;
 	unsigned int hval = bitwisehash(w, TSIZE, SEED);
-
 	for (hprv = NULL, htmp = ht[hval]; htmp != NULL && scmp(htmp->wd, w) != 0; hprv = htmp, htmp = htmp->next);
 	if (htmp == NULL) {
 		htmp = (HASHND *)malloc(sizeof(HASHND));
@@ -103,6 +103,7 @@ void hashinsert(HASHND **ht, char *w, int start) { //insert a word node into the
 			hprv->next = htmp;
 	}
 	else {
+		if (start == 1) htmp->start = 1;
 		if (htmp->count > MAX_COUNT){
 			if (htmp->over == 0) {
 				htmp->over = 1; 
@@ -117,6 +118,8 @@ void hashinsert(HASHND **ht, char *w, int start) { //insert a word node into the
 int indexinhash(HASHND ** ht, char *w) { //search the index of the word
 	unsigned int hval = bitwisehash(w, TSIZE, SEED);
 	HASHND *htmp, *hprv;
+	if (strlen(w) == 1 && ((w[0] == '-') || (w[0] == '/') || (w[0] == '.'))) return -3;
+	if(strlen(w) == 1 && (('0' <= w[0]) && (w[0] <= '9'))) return -3;
 	for (hprv = NULL, htmp = ht[hval]; htmp != NULL && scmp(htmp->wd, w) != 0; hprv = htmp, htmp = htmp->next);
 	if (htmp == NULL) {
 		printf("There isn't %s in hashtable\n", w);
@@ -130,7 +133,7 @@ int indexinhash(HASHND ** ht, char *w) { //search the index of the word
 	}
 }
 
-int print_count(HASHND **ht, char *w) { //return the number of the word appearances from he hashtable
+void word_hashvalues(HASHND **ht, char *w) { //return the number of the word appearances from he hashtable
 	unsigned int hval = bitwisehash(w, TSIZE, SEED);
 	HASHND *htmp, *hprv;
 	for (hprv = NULL, htmp = ht[hval]; htmp != NULL && scmp(htmp->wd, w) != 0; hprv = htmp, htmp = htmp->next);
@@ -138,7 +141,7 @@ int print_count(HASHND **ht, char *w) { //return the number of the word appearan
 		printf("There isn't %s in hashtable\n", w);
 		return -2;
 	}
-	return htmp->count;
+	return printf("%s: count: %d, start: %d, over: %d, index: %d\n", w, htmp->count, htmp->start, htmp->over, htmp->index);
 }
 
 int print_start(HASHND **ht, char *w) { //return the start value from the hashtable
@@ -177,6 +180,14 @@ int check_start(HASHND **ht, char *wd) { //return the word's start value
 	else return htmp->start;
 }
 
+int check_over(HASHND **ht, char *wd) { //return the word's start value
+	HASHND *htmp;
+	unsigned int hval = bitwisehash(wd, TSIZE, SEED);
+	for (htmp = ht[hval]; htmp != NULL && scmp(htmp->wd, wd) != 0; htmp = htmp->next);
+	if (htmp == NULL) return -1;
+	else return htmp->over;
+}
+
 /*void init_W() {
 	for (int i = 0; i < total_num; i++) {
 		for (int j = 0; j < total_num; j++) {
@@ -199,7 +210,7 @@ int make_W(HASHND **ht, FILE *fin) { //make matrix W
 		double weight, part_w, temp;
 		int n = get_word(word, fin);
 		//printf("%s\n", word);
-		if (n == -1) continue;
+		if (n == -1 || n == 2) continue;
 		else if (n) {
 			for (i = 0; i < ind; i++) {
 				w1_ind = indarr[i];
@@ -246,11 +257,29 @@ int get_word(char *word, FILE *fin) { // return 1: \n, 0: regular words, -1: [TE
 	for (; ;) {
 		ch = fgetc(fin);
 		if (ch == '\r') continue;
+		if (i == 0 && (('0' <= ch) && (ch <= '9'))) {
+			word[i] = ch;
+			word[i + 1] = '\0';
+			return 2; //number
+		}
+		if (i == 0 && ((ch == '-') || (ch == '/') || (ch == '.'))) {
+			word[i] = ch;
+			word[i + 1] = '\0';
+			return 2; //special character
+		}
 		if (i == 0 && ((ch == '\n') || (ch == EOF))) {
 			word[i] = 0;
 			return 1;
 		}
 		if (i == 0 && ((ch == ' ' || ch == '\t'))) continue;
+		if ((ch == '/') || (ch == '-') || (ch == '.')) { //special character
+			ungetc(ch, fin);
+			break;
+		}
+		if (('0' <= ch) && (ch <= '9')) { //number
+			ungetc(ch, fin);
+			break;
+		}
 		if ((ch == EOF) || (ch == ' ') || (ch == '\t') || (ch == '\n')) {
 			if (ch == '\n') ungetc(ch, fin);
 			break;
@@ -327,6 +356,7 @@ int main(void)
 	FILE *fin = fopen("replace_ordinal.txt", "r");
 	while (!feof(fin)) {
 		int n = get_word(word, fin);
+		if (n == 2) continue;
 		if (n == 1) {
 			strcount++;
 			start = 1;
@@ -339,12 +369,10 @@ int main(void)
 	fclose(fin);
 	printf("Make hash table\n");
 
-	printf("aplicable: %d\n", print_count(hashtb, "APPLICABLE"));
-
-	//printf("words number%d\n", total_num);
+	printf("words number%d\n", total_num);
 
 	//printf("max: %d\n", printinghash(hashtb));
-	//printf("string number = %d\n", strcount);
+	printf("string number = %d\n", strcount);
 
 	fin = fopen("replace_ordinal.txt", "r");
 	if (make_W(hashtb, fin)) {
@@ -353,7 +381,7 @@ int main(void)
 	}
 	fclose(fin);
 
-	printf("CANCELATION: %d\n", print_start(hashtb, "CANCELLATION"));
+	printf("done\n");
 
 	/*
 	FILE *fout = fopen("matrixW.txt", "w");
@@ -400,9 +428,12 @@ int main(void)
 	fclose(hashfile);
 	*/
 	
+	word_hashvalues(hashtb, "FOR");
+	word_hashvalues(hashtb, "ALL");
 
-	FILE *test = fopen("test_input3.txt", "r");
-	FILE *result = fopen("test_result3.txt", "w");
+
+	FILE *test = fopen("test_input4.txt", "r");
+	FILE *result = fopen("test_output4.txt", "w");
 	int flag1 = 0; //0: fill the empty window from index of center to last of the window //1: add one word to last index of the window
 	int flag2 = 0; //when the window is empty(flag1=0) //0: get words from test_input().txt //1: get words from the buffer
 	int prflag;
@@ -421,7 +452,7 @@ int main(void)
 						tmpind = indexinhash(hashtb, word);
 						insert_buffer(&buffer, sentnum, tmpind, word);
 						//print_buffer(buffer);
-						if (n == -1 || tmpind == -1) {
+						if (n == -1 || tmpind == -1 || tmpind == -2 || tmpind == -3 ) { //[CURRENCY] or [DATE] or [TERMS] (n==-1) or limit over word(tmpind==-1) or spectial character or number(tmpind==-3) or new word(tmpind==-2)
 							sentnum++;
 							i--;
 							continue;
@@ -445,7 +476,7 @@ int main(void)
 						temp = temp->next;
 						continue;
 					}
-					else if (temp != NULL && temp->index == -1) {
+					else if (temp != NULL && (temp->index == -1 || temp->index == -2 || temp->index == -3)) {
 						i--;
 						temp = temp->next;
 						continue;
@@ -461,7 +492,7 @@ int main(void)
 							tmpind = indexinhash(hashtb, word);
 							insert_buffer(&buffer, sentnum, tmpind, word);
 							//print_buffer(buffer);
-							if (n == -1 || tmpind == -1) {
+							if (n == -1 || tmpind == -1 || tmpind == -2 || tmpind == -3) {
 								sentnum++;
 								i--;
 								continue;
@@ -488,7 +519,7 @@ int main(void)
 			int flag = 0;
 			if (bfptr != NULL) { //get a word from the buffer
 				while (bfptr != NULL) {
-					if (bfptr->index == -1) {
+					if (bfptr->index == -1 || bfptr->index == -2 || bfptr->index==-3) {
 						bfptr = bfptr->next;
 						continue;
 					}
@@ -508,7 +539,7 @@ int main(void)
 						n = get_word(word, test);
 						tmpind = indexinhash(hashtb, word);
 						insert_buffer(&buffer, sentnum, tmpind, word);
-						if (n == -1 || tmpind == -1) {
+						if (n == -1 || tmpind == -1 || tmpind == -2 || tmpind == -3) {
 							sentnum++;
 							continue;
 						}
@@ -577,7 +608,7 @@ int main(void)
 					else fprintf(result, " %s", outw);
 				}
 				else {
-					fprintf(result, "\n");
+					fprintf(result, ".\n");
 					fclose(test);
 					fclose(result);
 					return 0;
@@ -609,9 +640,13 @@ int main(void)
 					else fprintf(result, " %s", outw);
 				}
 				else {
+					if (check_start(hashtb, buffer->word) == 1 && check_start(hashtb, (buffer->next)->word) == 1) {
+						fprintf(result, " %s", bfptr->word);
+						delete_buffer(&buffer);
+					}
 					while (1) {
 						if (check_start(hashtb, buffer->word) == 1) {
-							fprintf(result, "\n");
+							fprintf(result, ".\n");
 							if (bfptr != NULL) flag1 = 0;
 							punct_l = -1; punct_r = -1;
 							breakflag = 1;
@@ -619,7 +654,7 @@ int main(void)
 						}
 						else {
 							if (buffer->num == high) {
-								fprintf(result, "\n");
+								fprintf(result, ".\n");
 								if (bfptr != NULL) flag1 = 0;
 								punct_l = -1; punct_r = -1;
 								breakflag = 1;
@@ -640,13 +675,19 @@ int main(void)
 			printf("\n-------------------------------------------\n");
 			printf("punct_l is equal to punct_r\n");
 			while (1) {
-				if (buffer->num > tail) {
+				if (buffer->num == tail) {
+					if (check_start(hashtb, buffer->word) == 1 && check_start(hashtb, (buffer->next)->word) == 1){
+						fprintf(result, " %s", bfptr->word);
+						delete_buffer(&buffer);
+					}
+				}
+				else if (buffer->num > tail) {
 					if (check_start(hashtb, buffer->word) == 1) {
 						if (bfptr != NULL) flag1 = 0;
 						punct_l = -1; punct_r = -1;
 						printf("\n\n-----------------------------------------------\n");
 						printf("next sentence segmentation!\n\n");
-						fprintf(result, "\n");
+						fprintf(result, ".\n");
 						break;
 					}
 				}
@@ -664,7 +705,7 @@ int main(void)
 					punct_l = -1; punct_r = -1;
 					printf("\n\n-----------------------------------------------\n");
 					printf("next sentence segmentation!\n\n");
-					fprintf(result, "\n");
+					fprintf(result, ".\n");
 					break;
 				}
 			}

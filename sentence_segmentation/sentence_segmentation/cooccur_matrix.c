@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 
-//#define MAX_LENGTH 1671 //ts
-#define MAX_LENGTH 13164 //brown
+#define MAX_LENGTH 1671 //ts
+//#define MAX_LENGTH 13164 //brown
 #define TSIZE 1048576
 #define SEED 1159241
 #define WINDOW_S 5
@@ -432,8 +432,8 @@ int main(void)
 	word_hashvalues(hashtb, "ALL");
 
 
-	FILE *test = fopen("test_input4.txt", "r");
-	FILE *result = fopen("test_output4.txt", "w");
+	FILE *test = fopen("ts_test.txt", "r");
+	FILE *result = fopen("ts_test_output1.txt", "w");
 	int flag1 = 0; //0: fill the empty window from index of center to last of the window //1: add one word to last index of the window
 	int flag2 = 0; //when the window is empty(flag1=0) //0: get words from test_input().txt //1: get words from the buffer
 	int prflag;
@@ -608,7 +608,7 @@ int main(void)
 					else fprintf(result, " %s", outw);
 				}
 				else {
-					fprintf(result, ".\n");
+					fprintf(result, "\n");
 					fclose(test);
 					fclose(result);
 					return 0;
@@ -640,13 +640,16 @@ int main(void)
 					else fprintf(result, " %s", outw);
 				}
 				else {
-					if (check_start(hashtb, buffer->word) == 1 && check_start(hashtb, (buffer->next)->word) == 1) {
-						fprintf(result, " %s", bfptr->word);
+					printf(">>>>>>>>>%d\n");
+					if ((buffer->num == tail) && (check_start(hashtb, buffer->word) == 1 && check_start(hashtb, (buffer->next)->word) == 1)) {
+						printf("%s %d | %s %d\n",buffer->word, check_start(hashtb, buffer->word), (buffer->next)->word,  check_start(hashtb, (buffer->next)->word));
+						fprintf(result, " %s", buffer->word);
 						delete_buffer(&buffer);
+						continue;
 					}
 					while (1) {
 						if (check_start(hashtb, buffer->word) == 1) {
-							fprintf(result, ".\n");
+							fprintf(result, "\n");
 							if (bfptr != NULL) flag1 = 0;
 							punct_l = -1; punct_r = -1;
 							breakflag = 1;
@@ -654,7 +657,7 @@ int main(void)
 						}
 						else {
 							if (buffer->num == high) {
-								fprintf(result, ".\n");
+								fprintf(result, "\n");
 								if (bfptr != NULL) flag1 = 0;
 								punct_l = -1; punct_r = -1;
 								breakflag = 1;
@@ -677,8 +680,10 @@ int main(void)
 			while (1) {
 				if (buffer->num == tail) {
 					if (check_start(hashtb, buffer->word) == 1 && check_start(hashtb, (buffer->next)->word) == 1){
-						fprintf(result, " %s", bfptr->word);
+						printf("%s", buffer->word);
+						fprintf(result, " %s", buffer->word);
 						delete_buffer(&buffer);
+						continue;
 					}
 				}
 				else if (buffer->num > tail) {
@@ -687,7 +692,7 @@ int main(void)
 						punct_l = -1; punct_r = -1;
 						printf("\n\n-----------------------------------------------\n");
 						printf("next sentence segmentation!\n\n");
-						fprintf(result, ".\n");
+						fprintf(result, "\n");
 						break;
 					}
 				}
@@ -705,7 +710,7 @@ int main(void)
 					punct_l = -1; punct_r = -1;
 					printf("\n\n-----------------------------------------------\n");
 					printf("next sentence segmentation!\n\n");
-					fprintf(result, ".\n");
+					fprintf(result, "\n");
 					break;
 				}
 			}

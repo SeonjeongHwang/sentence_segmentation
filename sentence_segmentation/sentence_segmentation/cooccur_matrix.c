@@ -14,7 +14,7 @@ double W[MAX_LENGTH][MAX_LENGTH];
 int total_num = 0;
 int Windex = 0;
 
-/*common variables*/
+/*variables*/
 // num: the index of word from test_input().txt, differenct nums to one word at different places
 // index: index of matrix W, W: relative cooccurrence distance between the nearest two words -> co
 // over: when the number of word appearances is above the limit, over = 1
